@@ -20,28 +20,35 @@ export async function buscarPrecoSkin(linkSkin: string): Promise<number | null> 
     
     console.log(`🔍 Buscando preço para: ${skinName}`);
     
+    // Cria um AbortController para timeout de 25 segundos (aumentado)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 25000);
+    
     const response = await fetch(apiUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      }
+      },
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
-      console.error(`❌ Erro na API Steam: ${response.status}`);
+      console.error(`❌ Erro na API Steam: ${response.status} - ${response.statusText}`);
       return null;
     }
 
     const data = await response.json();
     
     if (!data.success) {
-      console.error('❌ API retornou success: false');
+      console.error('❌ API retornou success: false para:', skinName);
       return null;
     }
 
     // Extrai o preço (lowest_price ou median_price)
     const precoStr = data.lowest_price || data.median_price;
     if (!precoStr) {
-      console.error('❌ Nenhum preço encontrado');
+      console.error('❌ Nenhum preço encontrado para:', skinName);
       return null;
     }
 
@@ -57,8 +64,12 @@ export async function buscarPrecoSkin(linkSkin: string): Promise<number | null> 
     console.log(`✅ Preço encontrado: R$ ${precoNumero.toFixed(2)}`);
     return precoNumero;
 
-  } catch (error) {
-    console.error('❌ Erro ao buscar preço:', error);
+  } catch (error: any) {
+    if (error.name === 'AbortError') {
+      console.error('❌ Timeout ao buscar preço (25s) para:', linkSkin);
+    } else {
+      console.error('❌ Erro ao buscar preço:', error.message || error);
+    }
     return null;
   }
 }

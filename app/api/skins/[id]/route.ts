@@ -12,7 +12,7 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { nome, link, precoAlvo, imagemUrl, status } = await request.json();
+    const { nome, link, precoAlvo, imagemUrl, status, tipoAlerta } = await request.json();
     const { id } = params;
 
     if (!nome || !link || !precoAlvo) {
@@ -29,12 +29,20 @@ export async function PUT(
       );
     }
 
+    if (tipoAlerta && !['compra', 'venda'].includes(tipoAlerta)) {
+      return NextResponse.json(
+        { success: false, error: "Tipo de alerta deve ser 'compra' ou 'venda'" },
+        { status: 400 }
+      );
+    }
+
     const skinAtualizada = await prisma.skin.update({
       where: { id },
       data: {
         nome: nome.trim(),
         link: link.trim(),
         precoAlvo: parseFloat(precoAlvo),
+        tipoAlerta: tipoAlerta || 'compra',
         imagemUrl: imagemUrl?.trim() || null,
         status: status || "ativo"
       }

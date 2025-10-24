@@ -37,6 +37,7 @@ interface Skin {
   precoAlvo: number;
   precoAtual: number | null;
   status: string;
+  tipoAlerta: string;
   imagemUrl: string | null;
   createdAt: string;
   updatedAt: string;
@@ -59,12 +60,17 @@ interface FormData {
   nome: string;
   link: string;
   precoAlvo: string;
+  tipoAlerta: string;
   imagemUrl: string;
 }
 
 interface Configuracao {
   id: string;
   email: string | null;
+  webhookDiscord: string | null;
+  discordRoleMention: string | null;
+  alertasEmail: boolean;
+  alertasDiscord: boolean;
   ultimaVerificacao: string | null;
 }
 
@@ -78,12 +84,17 @@ export function SkinsMonitorApp() {
     nome: "",
     link: "",
     precoAlvo: "",
+    tipoAlerta: "compra",
     imagemUrl: ""
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [config, setConfig] = useState<Configuracao | null>(null);
   const [configForm, setConfigForm] = useState({
-    email: ""
+    email: "",
+    webhookDiscord: "",
+    discordRoleMention: "",
+    alertasEmail: true,
+    alertasDiscord: true
   });
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [isVerificando, setIsVerificando] = useState(false);
@@ -134,7 +145,11 @@ export function SkinsMonitorApp() {
       if (result.success && result.data) {
         setConfig(result.data);
         setConfigForm({
-          email: result.data.email || ""
+          email: result.data.email || "",
+          webhookDiscord: result.data.webhookDiscord || "",
+          discordRoleMention: result.data.discordRoleMention || "",
+          alertasEmail: result.data.alertasEmail ?? true,
+          alertasDiscord: result.data.alertasDiscord ?? true
         });
       }
     } catch (error) {
@@ -188,14 +203,27 @@ export function SkinsMonitorApp() {
       const response = await fetch("/api/monitor", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tipo: "manual" })
       });
 
       const result = await response.json();
 
       if (result.success) {
+        // Mostra mensagem detalhada
+        let descricao = result.message;
+        
+        // Se houver skins com falha, mostra quais foram
+        if (result.skinsFalha > 0 && result.skinsFalhadas?.length > 0) {
+          descricao += '\n\nSkins com erro:';
+          result.skinsFalhadas.forEach((skin: any) => {
+            descricao += `\n• ${skin.nome}: ${skin.erro}`;
+          });
+        }
+        
         toast({
-          title: "Verificação concluída!",
-          description: `${result.skinsVerificadas} skins verificadas. ${result.alertasEnviados} alerta(s) enviado(s).`,
+          title: result.skinsFalha > 0 ? "Verificação concluída com erros" : "Verificação concluída!",
+          description: descricao,
+          variant: result.skinsFalha > 0 ? "destructive" : "default",
         });
         fetchSkins();
         fetchAlertas();
@@ -250,6 +278,7 @@ export function SkinsMonitorApp() {
           nome: formData.nome.trim(),
           link: formData.link.trim(),
           precoAlvo: precoNumerico,
+          tipoAlerta: formData.tipoAlerta,
           imagemUrl: formData.imagemUrl?.trim() || null
         }),
       });
@@ -316,13 +345,14 @@ export function SkinsMonitorApp() {
       nome: skin.nome,
       link: skin.link,
       precoAlvo: skin.precoAlvo.toString(),
+      tipoAlerta: skin.tipoAlerta || "compra",
       imagemUrl: skin.imagemUrl || ""
     });
     setIsDialogOpen(true);
   };
 
   const resetForm = () => {
-    setFormData({ nome: "", link: "", precoAlvo: "", imagemUrl: "" });
+    setFormData({ nome: "", link: "", precoAlvo: "", tipoAlerta: "compra", imagemUrl: "" });
     setEditingSkin(null);
   };
 
@@ -428,6 +458,31 @@ export function SkinsMonitorApp() {
                       className="cs2-input"
                       required
                     />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="tipoAlerta">Tipo de Alerta *</Label>
+                    <Select
+                      value={formData.tipoAlerta}
+                      onValueChange={(value) => setFormData({ ...formData, tipoAlerta: value })}
+                    >
+                      <SelectTrigger className="cs2-input">
+                        <SelectValue placeholder="Selecione o tipo de alerta" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="compra">
+                          🔽 Alerta de Compra (preço baixo)
+                        </SelectItem>
+                        <SelectItem value="venda">
+                          🔼 Alerta de Venda (preço alto)
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {formData.tipoAlerta === 'compra' 
+                        ? '🔽 Você será alertado quando o preço cair para o valor alvo ou menos' 
+                        : '🔼 Você será alertado quando o preço subir para o valor alvo ou mais'}
+                    </p>
                   </div>
                   
                   <div>
@@ -600,7 +655,7 @@ export function SkinsMonitorApp() {
                                   <h3 className="font-semibold text-lg truncate">
                                     {skin.nome}
                                   </h3>
-                                  <div className="flex items-center gap-4 mt-1">
+                                  <div className="flex items-center gap-4 mt-1 flex-wrap">
                                     <span className="text-sm text-muted-foreground">
                                       Alvo: <span className="cs2-accent font-medium">
                                         {formatPrice(skin.precoAlvo)}
@@ -612,6 +667,9 @@ export function SkinsMonitorApp() {
                                       </span>
                                     </span>
                                     {getStatusBadge(skin.status)}
+                                    <Badge variant={skin.tipoAlerta === 'compra' ? 'default' : 'secondary'} className="text-xs">
+                                      {skin.tipoAlerta === 'compra' ? '🔽 Compra' : '🔼 Venda'}
+                                    </Badge>
                                   </div>
                                 </div>
                               </div>
@@ -741,11 +799,105 @@ export function SkinsMonitorApp() {
                         }
                         placeholder="seu@email.com"
                         className="cs2-input"
-                        required
                       />
                       <p className="text-xs text-muted-foreground">
                         Você receberá alertas neste email quando os preços das skins atingirem o preço alvo definido
                       </p>
+                    </div>
+
+                    {/* Webhook Discord */}
+                    <div className="space-y-2">
+                      <Label htmlFor="webhookDiscord" className="flex items-center gap-2 text-base font-semibold">
+                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515a.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0a12.64 12.64 0 0 0-.617-1.25a.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057a19.9 19.9 0 0 0 5.993 3.03a.078.078 0 0 0 .084-.028a14.09 14.09 0 0 0 1.226-1.994a.076.076 0 0 0-.041-.106a13.107 13.107 0 0 1-1.872-.892a.077.077 0 0 1-.008-.128a10.2 10.2 0 0 0 .372-.292a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127a12.299 12.299 0 0 1-1.873.892a.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028a19.839 19.839 0 0 0 6.002-3.03a.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.956-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.955-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.946 2.418-2.157 2.418z"/>
+                        </svg>
+                        Webhook Discord (Opcional)
+                      </Label>
+                      <Input
+                        id="webhookDiscord"
+                        type="url"
+                        value={configForm.webhookDiscord}
+                        onChange={(e) => 
+                          setConfigForm({ ...configForm, webhookDiscord: e.target.value })
+                        }
+                        placeholder="https://discord.com/api/webhooks/..."
+                        className="cs2-input"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Cole aqui a URL do webhook do seu canal Discord para receber alertas também lá.{" "}
+                        <a 
+                          href="https://support.discord.com/hc/pt-br/articles/228383668-Usando-Webhooks" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-orange-500 hover:underline"
+                        >
+                          Como criar um webhook?
+                        </a>
+                      </p>
+                    </div>
+
+                    {/* Discord Role Mention */}
+                    <div className="space-y-2">
+                      <Label htmlFor="discordRoleMention" className="flex items-center gap-2 text-base font-semibold">
+                        <Shield className="h-4 w-4" />
+                        ID da Role do Discord (Opcional)
+                      </Label>
+                      <Input
+                        id="discordRoleMention"
+                        type="text"
+                        value={configForm.discordRoleMention}
+                        onChange={(e) => 
+                          setConfigForm({ ...configForm, discordRoleMention: e.target.value })
+                        }
+                        placeholder="123456789012345678"
+                        className="cs2-input"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Para mencionar uma role específica nos alertas, cole aqui o <strong>ID da role</strong> do Discord.
+                        <br />
+                        <strong>Como obter o ID:</strong> No Discord, vá em Configurações do Servidor → Roles → Clique nos 3 pontinhos da role → Copiar ID da Role
+                        <br />
+                        <em>Exemplo: Se você quiser mencionar @OhnePixel, cole o ID numérico da role aqui</em>
+                      </p>
+                    </div>
+
+                    {/* Switches para ativar/desativar alertas */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="space-y-0.5">
+                          <Label htmlFor="alertasEmail" className="text-base font-semibold">
+                            Ativar Alertas por Email
+                          </Label>
+                          <p className="text-xs text-muted-foreground">
+                            Receba notificações no email configurado acima
+                          </p>
+                        </div>
+                        <Switch
+                          id="alertasEmail"
+                          checked={configForm.alertasEmail}
+                          onCheckedChange={(checked) =>
+                            setConfigForm({ ...configForm, alertasEmail: checked })
+                          }
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="space-y-0.5">
+                          <Label htmlFor="alertasDiscord" className="text-base font-semibold">
+                            Ativar Alertas por Discord
+                          </Label>
+                          <p className="text-xs text-muted-foreground">
+                            Receba notificações no canal Discord configurado acima
+                          </p>
+                        </div>
+                        <Switch
+                          id="alertasDiscord"
+                          checked={configForm.alertasDiscord}
+                          onCheckedChange={(checked) =>
+                            setConfigForm({ ...configForm, alertasDiscord: checked })
+                          }
+                        />
+                      </div>
                     </div>
 
                     {/* Informações adicionais */}
@@ -764,9 +916,10 @@ export function SkinsMonitorApp() {
                       <AlertDescription>
                         <strong>Como funciona:</strong>
                         <ul className="mt-2 space-y-1 text-sm">
-                          <li>• O sistema verifica automaticamente os preços das skins ativas através de um cron job externo</li>
-                          <li>• Quando o preço atingir ou ficar abaixo do preço alvo, você receberá um alerta por email</li>
-                          <li>• Configure seu email abaixo para receber os alertas</li>
+                          <li>• O sistema verifica automaticamente os preços das skins através de um cron job externo a cada 15 minutos</li>
+                          <li>• Você pode receber alertas por <strong>Email</strong> e/ou <strong>Discord</strong></li>
+                          <li>• Suporte a alertas de <strong>Compra</strong> (quando preço cai) e <strong>Venda</strong> (quando preço sobe)</li>
+                          <li>• Configure pelo menos um método de notificação abaixo</li>
                           <li>• Você pode verificar os preços manualmente a qualquer momento clicando em "Verificar Agora"</li>
                         </ul>
                       </AlertDescription>
@@ -778,7 +931,7 @@ export function SkinsMonitorApp() {
                         type="button"
                         variant="outline"
                         onClick={handleVerificarPrecos}
-                        disabled={isVerificando || !configForm.email}
+                        disabled={isVerificando || (!configForm.email && !configForm.webhookDiscord)}
                         className="border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-white"
                       >
                         {isVerificando ? "Verificando..." : "🔍 Verificar Agora"}
@@ -786,9 +939,9 @@ export function SkinsMonitorApp() {
                       <Button
                         type="submit"
                         className="cs2-button"
-                        disabled={isSavingConfig || !configForm.email}
+                        disabled={isSavingConfig || (!configForm.email && !configForm.webhookDiscord)}
                       >
-                        {isSavingConfig ? "Salvando..." : "Salvar Email"}
+                        {isSavingConfig ? "Salvando..." : "Salvar Configurações"}
                       </Button>
                     </div>
                   </form>

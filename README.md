@@ -276,10 +276,18 @@ Este projeto é de código aberto e está disponível sob a licença MIT.
 
 Desenvolvido com ❤️ para a comunidade CS2
 
+## 📚 Documentação
+
+- **[GUIA_CRON.md](./GUIA_CRON.md)** - ⚡ Como configurar o monitoramento automático
+- **[GUIA_ALERTAS.md](./GUIA_ALERTAS.md)** - Como funciona o sistema de alertas
+- **[INSTRUCOES_DISCORD_ROLE.md](./INSTRUCOES_DISCORD_ROLE.md)** - Configuração de roles no Discord
+- **[CHANGELOG.md](./CHANGELOG.md)** - Histórico de mudanças
+
 ## 🔗 Links Úteis
 
 - [Steam Market](https://steamcommunity.com/market/)
 - [CS2 Skins](https://steamcommunity.com/market/search?appid=730)
+- [Cron-Job.org](https://cron-job.org/) - Para monitoramento automático
 - [Documentação Next.js](https://nextjs.org/docs)
 - [Documentação Prisma](https://www.prisma.io/docs)
 

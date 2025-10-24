@@ -10,15 +10,18 @@ datasource db {
 }
 
 model Skin {
-  id          String   @id @default(cuid())
-  nome        String
-  link        String   @unique
-  precoAlvo   Float    // Preço em R$ que o usuário quer ser alertado
-  precoAtual  Float?   // Preço atual, será atualizado pelo daemon
-  status      String   @default("ativo") // "ativo", "alerta_enviado", "inativo"
-  imagemUrl   String?  // URL da imagem da skin (se extraída)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                  String   @id @default(cuid())
+  nome                String
+  link                String   @unique
+  precoAlvo           Float    // Preço em R$ que o usuário quer ser alertado
+  precoAtual          Float?   // Preço atual, será atualizado pelo daemon
+  status              String   @default("ativo") // "ativo", "alerta_enviado", "inativo"
+  tipoAlerta          String   @default("compra") // "compra" (preço baixo) ou "venda" (preço alto)
+  imagemUrl           String?  // URL da imagem da skin (se extraída)
+  ultimoAlertaManual  DateTime? // Data do último alerta enviado via verificação manual
+  lastChecked         DateTime? // Data/hora da última verificação de preço (usado para rotação)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
   
   // Relacionamento com alertas
   alertas     Alerta[]
@@ -41,6 +44,10 @@ model Alerta {
 model Configuracao {
   id                  String   @id @default(cuid())
   email               String?  // Email para receber alertas
+  webhookDiscord      String?  // URL do webhook do Discord para enviar alertas
+  discordRoleMention  String?  // Nome da role do Discord para mencionar (ex: @OhnePixel)
+  alertasEmail        Boolean  @default(true) // Se deve enviar alertas por email
+  alertasDiscord      Boolean  @default(true) // Se deve enviar alertas por Discord
   ultimaVerificacao   DateTime? // Data/hora da última verificação de preços
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt

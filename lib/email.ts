@@ -20,17 +20,23 @@ export interface AlertEmail {
   skinNome: string;
   precoAtual: number;
   precoAlvo: number;
+  tipoAlerta: 'compra' | 'venda';
   skinLink: string;
   skinImagemUrl?: string;
 }
 
 export async function enviarEmailAlerta(dados: AlertEmail) {
-  const { to, skinNome, precoAtual, precoAlvo, skinLink, skinImagemUrl } = dados;
+  const { to, skinNome, precoAtual, precoAlvo, tipoAlerta, skinLink, skinImagemUrl } = dados;
+
+  const isCompra = tipoAlerta === 'compra';
+  const emoji = isCompra ? '🔽' : '🔼';
+  const acao = isCompra ? 'CAIU' : 'SUBIU';
+  const tipoTexto = isCompra ? 'Compra' : 'Venda';
 
   const mailOptions = {
     from: `"CS2 Skin Monitor" <${process.env.EMAIL_USER || 'noreply@cs2monitor.com'}>`,
     to,
-    subject: `🎯 Alerta de Preço: ${skinNome}`,
+    subject: `${emoji} Alerta de ${tipoTexto}: ${skinNome}`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -52,14 +58,15 @@ export async function enviarEmailAlerta(dados: AlertEmail) {
       <body>
         <div class="container">
           <div class="header">
-            <h1>🎯 Alerta de Preço Atingido!</h1>
+            <h1>${emoji} Alerta de ${tipoTexto} Atingido!</h1>
           </div>
           <div class="content">
-            <p style="font-size: 16px;">Boa notícia! O preço da sua skin monitorada atingiu o valor alvo:</p>
+            <p style="font-size: 16px;">Boa notícia! O preço da sua skin ${acao} e atingiu o valor alvo:</p>
             
             <div class="skin-info">
               <h2 style="margin: 0 0 10px 0; color: #ff6b35;">${skinNome}</h2>
               ${skinImagemUrl ? `<img src="${skinImagemUrl}" alt="${skinNome}" style="max-width: 100%; height: auto; border-radius: 4px; margin: 10px 0;" />` : ''}
+              <p style="margin: 10px 0;"><strong>📊 Tipo de Alerta:</strong> ${isCompra ? '🔽 Compra (Preço Baixo)' : '🔼 Venda (Preço Alto)'}</p>
               <p style="margin: 10px 0;"><strong>Preço Atual:</strong></p>
               <div class="price">R$ ${precoAtual.toFixed(2)}</div>
               <p class="target-price">Seu preço alvo era: R$ ${precoAlvo.toFixed(2)}</p>

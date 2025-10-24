@@ -32,7 +32,7 @@ export async function GET() {
 // POST - Adicionar nova skin
 export async function POST(request: NextRequest) {
   try {
-    const { nome, link, precoAlvo, imagemUrl } = await request.json();
+    const { nome, link, precoAlvo, imagemUrl, tipoAlerta } = await request.json();
 
     if (!nome || !link || !precoAlvo) {
       return NextResponse.json(
@@ -48,11 +48,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (tipoAlerta && !['compra', 'venda'].includes(tipoAlerta)) {
+      return NextResponse.json(
+        { success: false, error: "Tipo de alerta deve ser 'compra' ou 'venda'" },
+        { status: 400 }
+      );
+    }
+
     const novaSkin = await prisma.skin.create({
       data: {
         nome: nome.trim(),
         link: link.trim(),
         precoAlvo: parseFloat(precoAlvo),
+        tipoAlerta: tipoAlerta || 'compra',
         imagemUrl: imagemUrl?.trim() || null,
         status: "ativo"
       }
